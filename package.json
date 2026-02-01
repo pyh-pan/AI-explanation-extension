@@ -1,0 +1,11 @@
+{
+  "name": "ai-explanation-extension",
+  "version": "1.0.0",
+  "description": "AI划词解释Chrome插件",
+  "scripts": {
+    "build": "echo 'No build step required for vanilla JS'"
+  },
+  "keywords": ["chrome-extension", "ai", "openai", "gemini"],
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sudo:*)",
+      "Bash(sudo apt-get install:*)",
+      "Bash(node:*)",
+      "Bash(convert:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}

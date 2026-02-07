@@ -18,6 +18,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const testBtn = document.getElementById('testBtn');
   const statusMessage = document.getElementById('statusMessage');
 
+  // 上下文配置相关元素
+  const useContextCheckbox = document.getElementById('useContext');
+  const contextModeSelect = document.getElementById('contextMode');
+  const contextModeGroup = document.getElementById('contextModeGroup');
+  const enableHighlightCheckbox = document.getElementById('enableHighlight');
+  const highlightGroup = document.getElementById('highlightGroup');
+
+  // Prompt 模板相关元素
+  const promptTemplateSelect = document.getElementById('promptTemplateSelect');
+  const customTemplateGroup = document.getElementById('customTemplateGroup');
+  const customPromptTemplate = document.getElementById('customPromptTemplate');
+  const previewTemplateBtn = document.getElementById('previewTemplate');
+
   // 默认配置
   let currentConfig = {
     provider: 'openai',
@@ -25,7 +38,99 @@ document.addEventListener('DOMContentLoaded', () => {
     apiEndpoint: '',
     model: 'gpt-4o-mini',
     temperature: 0.7,
-    maxTokens: 1000
+    maxTokens: 1000,
+    // 上下文配置
+    useContext: true,
+    contextMode: 'standard',
+    enableHighlight: true,
+    promptTemplate: 'template:default'
+  };
+
+  // 预设模板库（用于预览）
+  const PRESET_TEMPLATES = {
+    'template:default': `你是一个智能助手，请基于网页内容的上下文，对用户选中的内容提供准确、深入的解释。
+
+【网页信息】
+标题: {{pageTitle}}
+链接: {{pageUrl}}
+
+【上下文内容】
+{{context}}
+
+【用户选中的内容】
+{{selectedText}}
+
+请基于上述上下文，从以下维度解释选中的内容：
+1. 在当前语境中的含义
+2. 背景和上下文信息
+3. 相关要点和细节
+4. 如果是专业术语，结合语境解释
+
+**重要提示:**
+- 优先结合上下文进行解释
+- 如果上下文不足，可以参考通用知识
+- 使用 Markdown 格式
+- 字数控制在 300-600 字之间`,
+
+    'template:technical': `你是一个技术文档解读助手，请基于上下文解释技术概念。
+
+【技术文档】
+标题: {{pageTitle}}
+链接: {{pageUrl}}
+
+【技术上下文】
+{{context}}
+
+【待解释的技术术语/概念】
+{{selectedText}}
+
+请提供：
+1. 该技术术语在当前文档中的具体含义
+2. 相关的技术背景和原理
+3. 实际应用场景和示例
+4. 相关技术栈和工具
+
+使用 Markdown 格式，尽可能详细和准确。`,
+
+    'template:academic': `你是一个学术研究助手，请基于论文上下文解释学术概念。
+
+【论文信息】
+标题: {{pageTitle}}
+链接: {{pageUrl}}
+
+【研究上下文】
+{{context}}
+
+【待解释的学术概念/术语】
+{{selectedText}}
+
+请从学术角度解释：
+1. 该概念在当前研究语境中的定义
+2. 相关的理论背景和研究现状
+3. 该概念在论文中的作用和重要性
+4. 相关的研究者和参考文献
+
+使用学术化语言，Markdown 格式。`,
+
+    'template:code': `你是一个代码理解助手，请基于代码上下文解释代码片段。
+
+【代码文件】
+{{pageTitle}}
+链接: {{pageUrl}}
+
+【代码上下文】
+{{context}}
+
+【选中的代码】
+{{selectedText}}
+
+请解释：
+1. 这段代码的具体功能
+2. 使用的技术和算法
+3. 输入参数和返回值
+4. 可能的边界情况和注意事项
+
+使用 Markdown 代码块格式，如果相关可以提供改进建议。`
   };
 
   // 加载已保存的配置
@@ -80,6 +185,28 @@ document.addEventListener('DOMContentLoaded', () => {
   // 监听测试按钮
   testBtn.addEventListener('click', testConnection);
 
+  // 监听上下文配置变化
+  useContextCheckbox.addEventListener('change', (e) => {
+    const enabled = e.target.checked;
+    contextModeGroup.style.display = enabled ? 'block' : 'none';
+    highlightGroup.style.display = enabled ? 'block' : 'none';
+  });
+
+  // 监听模板选择变化
+  promptTemplateSelect.addEventListener('change', (e) => {
+    const templateKey = e.target.value;
+
+    if (templateKey === 'custom') {
+      customTemplateGroup.style.display = 'block';
+    } else {
+      customTemplateGroup.style.display = 'none';
+      // 如果切换到预设模板，可以在这里显示预览
+    }
+  });
+
+  // 监听模板预览按钮
+  previewTemplateBtn.addEventListener('click', previewTemplate);
+
   // 加载配置
   function loadConfig() {
     chrome.storage.local.get(['aiConfig'], (result) => {
@@ -117,6 +244,37 @@ document.addEventListener('DOMContentLoaded', () => {
     temperatureInput.value = currentConfig.temperature;
     tempValueSpan.textContent = currentConfig.temperature;
     maxTokensInput.value = currentConfig.maxTokens;
+
+    // 设置上下文配置
+    if (currentConfig.useContext !== undefined) {
+      useContextCheckbox.checked = currentConfig.useContext;
+      contextModeGroup.style.display = currentConfig.useContext ? 'block' : 'none';
+      highlightGroup.style.display = currentConfig.useContext ? 'block' : 'none';
+    }
+
+    if (currentConfig.contextMode) {
+      contextModeSelect.value = currentConfig.contextMode;
+    }
+
+    if (currentConfig.enableHighlight !== undefined) {
+      enableHighlightCheckbox.checked = currentConfig.enableHighlight;
+    }
+
+    // 设置 Prompt 模板
+    if (currentConfig.promptTemplate) {
+      const template = currentConfig.promptTemplate;
+
+      // 检查是否是预设模板
+      if (template.startsWith('template:')) {
+        promptTemplateSelect.value = template;
+        customTemplateGroup.style.display = 'none';
+      } else {
+        // 自定义模板
+        promptTemplateSelect.value = 'custom';
+        customPromptTemplate.value = template;
+        customTemplateGroup.style.display = 'block';
+      }
+    }
   }
 
   // 更新模型选项
@@ -144,6 +302,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const temperature = parseFloat(temperatureInput.value);
     const maxTokens = parseInt(maxTokensInput.value);
 
+    // 收集上下文配置
+    const useContext = useContextCheckbox.checked;
+    const contextMode = contextModeSelect.value;
+    const enableHighlight = enableHighlightCheckbox.checked;
+
+    // 收集 Prompt 模板配置
+    let promptTemplate;
+    const templateSelect = promptTemplateSelect.value;
+
+    if (templateSelect === 'custom') {
+      promptTemplate = customPromptTemplate.value.trim();
+      if (!promptTemplate) {
+        showStatus('请输入自定义模板或选择预设模板', 'error');
+        return;
+      }
+    } else {
+      promptTemplate = templateSelect;
+    }
+
     // 验证
     if (!apiKey) {
       showStatus('请输入 API Key', 'error');
@@ -157,7 +334,11 @@ document.addEventListener('DOMContentLoaded', () => {
       apiEndpoint,
       model,
       temperature,
-      maxTokens
+      maxTokens,
+      useContext,
+      contextMode,
+      enableHighlight,
+      promptTemplate
     };
 
     chrome.storage.local.set({ aiConfig: config }, () => {
@@ -225,5 +406,103 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
       statusMessage.style.display = 'none';
     }, 3000);
+  }
+
+  // 预览模板
+  function previewTemplate() {
+    let template;
+
+    const templateSelect = promptTemplateSelect.value;
+
+    if (templateSelect === 'custom') {
+      template = customPromptTemplate.value.trim();
+      if (!template) {
+        showStatus('请先输入自定义模板', 'error');
+        return;
+      }
+    } else {
+      template = PRESET_TEMPLATES[templateSelect];
+    }
+
+    // 生成预览
+    const preview = template
+      .replace(/\{\{pageTitle\}\}/g, '示例网页标题')
+      .replace(/\{\{pageUrl\}\}/g, 'https://example.com/article')
+      .replace(/\{\{context\}\}/g, '这是网页的上下文内容示例...\n\n用户选中了一个术语需要解释。')
+      .replace(/\{\{selectedText\}\}/g, 'API')
+      .replace(/\{\{contextTokens\}\}/g, '6000');
+
+    // 创建预览弹窗
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `;
+
+    const content = document.createElement('div');
+    content.style.cssText = `
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
+
+    content.innerHTML = `
+      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Prompt 模板预览</h3>
+      <pre style="
+        background: #f5f5f5;
+        padding: 16px;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin: 0;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+      ">${escapeHtml(preview)}</pre>
+      <button id="closePreview" style="
+        margin-top: 16px;
+        padding: 8px 24px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+      ">关闭</button>
+    `;
+
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+
+    // 关闭按钮
+    document.getElementById('closePreview').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+
+    // 点击外部关闭
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+  }
+
+  // 转义 HTML
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 });

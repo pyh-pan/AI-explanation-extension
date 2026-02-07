@@ -431,3 +431,87 @@ footer p {
     flex-direction: column;
   }
 }
+
+/* ========================================
+   新增样式：上下文配置和 Prompt 模板
+   ======================================== */
+
+/* Checkbox 标签样式 */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #667eea;
+  cursor: pointer;
+}
+
+.checkbox-label span {
+  color: #374151;
+  font-size: 14px;
+}
+
+/* 代码编辑器样式 */
+.code-editor {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #f9fafb;
+}
+
+.code-editor:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  background: white;
+}
+
+/* 模板变量提示 */
+.template-variables {
+  margin-top: 8px;
+  padding: 12px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.template-variables strong {
+  color: #1f2937;
+}
+
+.template-variables code {
+  background: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+  color: #667eea;
+  border: 1px solid #e5e7eb;
+}
+
+/* 配置区域分隔 */
+.config-section {
+  background: #f9fafb;
+  padding: 24px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  border: 1px solid #e5e7eb;
+}
+
+.config-section h2 {
+  margin-top: 0;
+}

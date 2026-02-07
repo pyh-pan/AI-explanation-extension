@@ -266,3 +266,64 @@
 .ai-explain-popup-body::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* ========================================
+   上下文高亮样式 - 三层级透明度
+   ======================================== */
+
+/* 层级 1：选中文本前后各 3 段（最亮，50% 透明度） */
+.ai-context-level-1 {
+  background-color: rgba(255, 235, 59, 0.5) !important;
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+  cursor: help;
+}
+
+.ai-context-level-1:hover {
+  background-color: rgba(255, 235, 59, 0.65) !important;
+}
+
+/* 层级 2：选中文本前后各 5 段（中等亮度，30% 透明度） */
+.ai-context-level-2 {
+  background-color: rgba(255, 235, 59, 0.3) !important;
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+  cursor: help;
+}
+
+.ai-context-level-2:hover {
+  background-color: rgba(255, 235, 59, 0.45) !important;
+}
+
+/* 层级 3：其他参考内容（最淡，15% 透明度） */
+.ai-context-level-3 {
+  background-color: rgba(255, 235, 59, 0.15) !important;
+  border-radius: 3px;
+  transition: background-color 0.3s ease;
+  cursor: help;
+}
+
+.ai-context-level-3:hover {
+  background-color: rgba(255, 235, 59, 0.3) !important;
+}
+
+/* 确保高亮不影响嵌套元素的文本颜色 */
+.ai-context-level-1 *,
+.ai-context-level-2 *,
+.ai-context-level-3 * {
+  color: inherit !important;
+}
+
+/* 确保高亮不会破坏链接等交互元素 */
+.ai-context-level-1 a,
+.ai-context-level-2 a,
+.ai-context-level-3 a {
+  color: inherit !important;
+  text-decoration: inherit !important;
+}
+
+.ai-context-level-1 a:hover,
+.ai-context-level-2 a:hover,
+.ai-context-level-3 a:hover {
+  opacity: 0.8;
+}

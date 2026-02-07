@@ -8,6 +8,7 @@
   let explainPopup = null;
   let currentSelection = null;
   let isPopupVisible = false;
+  let currentHighlightRanges = null;  // 上下文高亮范围
 
   // 创建"AI解释"按钮
   function createExplainButton() {
@@ -157,10 +158,16 @@
     explainPopup.querySelector('.ai-explain-copy').style.display = 'none';
 
     isPopupVisible = true;
+
+    // 应用上下文高亮
+    if (currentHighlightRanges) {
+      applyHighlights(currentHighlightRanges);
+    }
   }
 
   // 隐藏弹窗
   function hidePopup() {
+    clearHighlights();  // 清除高亮
     if (explainPopup) {
       explainPopup.style.display = 'none';
     }
@@ -180,11 +187,78 @@
     showPopup();
 
     try {
-      // 发送消息到 background script
-      const response = await chrome.runtime.sendMessage({
+      // 获取用户配置
+      const config = await getConfig();
+
+      // 如果启用了上下文功能，提取页面内容
+      let contextData = null;
+      let mainContent = null;
+
+      if (config.useContext !== false) {  // 默认启用
+        try {
+          // 提取页面上下文（懒加载 + 缓存）
+          if (!window.contentExtractor) {
+            console.error('ContentExtractor not available');
+          } else {
+            mainContent = await window.contentExtractor.extract(document);
+            const position = window.contentExtractor.findSelectionPosition(selectedText);
+
+            // 获取上下文预算
+            const maxTokens = getContextMaxTokens(config.contextMode || 'standard');
+
+            // 检查内容是否充足
+            if (mainContent && window.contentExtractor.hasSufficientContent(mainContent)) {
+              // 距离优先截断
+              const context = window.contentExtractor.truncateByDistance(
+                mainContent,
+                position,
+                maxTokens
+              );
+
+              // 保存上下文范围用于高亮
+              currentHighlightRanges = context.highlightRanges;
+
+              contextData = {
+                content: context.content,
+                metadata: {
+                  paragraphs: context.paragraphs,
+                  totalTokens: context.usedTokens,
+                  pageTitle: mainContent.title,
+                  pageUrl: window.location.href,
+                  isFallback: mainContent.isFallback
+                }
+              };
+
+              console.log('[Content Script] Context extracted:', {
+                paragraphs: context.paragraphCount,
+                tokens: context.usedTokens,
+                mode: config.contextMode || 'standard'
+              });
+            } else {
+              console.log('[Content Script] Insufficient content, using no-context mode');
+            }
+          }
+        } catch (extractorError) {
+          console.warn('[Content Script] Context extraction failed:', extractorError);
+          // 继续使用无上下文模式
+        }
+      }
+
+      // 构建请求数据
+      const requestData = {
         type: 'EXPLAIN_TEXT',
         text: selectedText
-      });
+      };
+
+      // 如果有上下文数据，添加到请求中
+      if (contextData) {
+        requestData.context = contextData.content;
+        requestData.contextMetadata = contextData.metadata;
+        requestData.promptTemplate = config.promptTemplate || 'default';
+      }
+
+      // 发送消息到 background script
+      const response = await chrome.runtime.sendMessage(requestData);
 
       if (response.success) {
         showResult(response.result);
@@ -195,6 +269,62 @@
       showError('网络错误，请检查网络连接');
       console.error('Explain error:', error);
     }
+  }
+
+  // 获取配置
+  async function getConfig() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['aiConfig'], (result) => {
+        const config = result.aiConfig || {};
+        resolve({
+          useContext: config.useContext !== false,  // 默认启用
+          contextMode: config.contextMode || 'standard',  // economic/standard/precise
+          enableHighlight: config.enableHighlight !== false,  // 默认启用
+          promptTemplate: config.promptTemplate || 'default'
+        });
+      });
+    });
+  }
+
+  // 根据模式获取最大 token 数
+  function getContextMaxTokens(mode) {
+    const modes = {
+      economic: 2000,
+      standard: 6000,
+      precise: 12000
+    };
+    return modes[mode] || modes.standard;
+  }
+
+  // 应用三层级高亮
+  function applyHighlights(highlightRanges) {
+    if (!highlightRanges || highlightRanges.length === 0) return;
+
+    getConfig().then(config => {
+      if (config.enableHighlight === false) return;
+
+      highlightRanges.forEach(range => {
+        if (range.element && range.level) {
+          range.element.classList.add(`ai-context-level-${range.level}`);
+        }
+      });
+
+      console.log(`[Content Script] Applied highlights to ${highlightRanges.length} elements`);
+    });
+  }
+
+  // 清除所有高亮
+  function clearHighlights() {
+    if (!currentHighlightRanges) return;
+
+    for (let i = 1; i <= 3; i++) {
+      document.querySelectorAll(`.ai-context-level-${i}`).forEach(el => {
+        el.classList.remove(`ai-context-level-${i}`);
+      });
+    }
+
+    currentHighlightRanges = null;
+    console.log('[Content Script] Cleared highlights');
   }
 
   // 显示结果

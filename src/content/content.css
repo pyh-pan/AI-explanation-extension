@@ -1,81 +1,120 @@
-/* AI 解释按钮样式 */
+/* ========================================
+   AI Explanation Extension - Content Styles
+   Google Translator Inspired Design
+   Light Blue Theme
+   ======================================== */
+
+/* CSS Variables - Light Blue Palette */
+:root {
+  --ai-primary: #1a73e8;
+  --ai-primary-hover: #1557b0;
+  --ai-primary-light: #e8f0fe;
+  --ai-surface: #ffffff;
+  --ai-surface-elevated: #f8f9fa;
+  --ai-text-primary: #202124;
+  --ai-text-secondary: #5f6368;
+  --ai-border: #dadce0;
+  --ai-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --ai-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --ai-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --ai-radius-sm: 8px;
+  --ai-radius-md: 12px;
+  --ai-radius-lg: 16px;
+  --ai-transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================
+   AI Explain Button
+   ======================================== */
+
 .ai-explain-button {
   position: absolute;
   z-index: 2147483647;
   display: none;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 6px;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--ai-surface);
+  color: var(--ai-primary);
+  border-radius: var(--ai-radius-sm);
   font-size: 13px;
   font-weight: 500;
+  font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
-  transition: all 0.2s ease;
+  box-shadow: var(--ai-shadow-md);
+  transition: var(--ai-transition);
   user-select: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  border: 1px solid var(--ai-border);
+  backdrop-filter: blur(8px);
 }
 
 .ai-explain-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+  box-shadow: var(--ai-shadow-lg);
+  background: var(--ai-primary-light);
+  color: var(--ai-primary-hover);
+  border-color: var(--ai-primary);
 }
 
 .ai-explain-button:active {
   transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+  box-shadow: var(--ai-shadow-sm);
 }
 
 .ai-explain-button svg {
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
 }
 
-/* AI 解释弹窗样式 */
+/* ========================================
+   AI Explain Popup
+   ======================================== */
+
 .ai-explain-popup {
   position: absolute;
   z-index: 2147483647;
   display: none;
-  background: rgba(0, 0, 0, 0.4);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .ai-explain-popup-content {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  background: var(--ai-surface);
+  border-radius: var(--ai-radius-lg);
+  box-shadow: var(--ai-shadow-lg);
   overflow: hidden;
-  max-width: 450px;
-  width: 450px;
-  max-height: 60vh;
+  max-width: 480px;
+  width: 480px;
+  max-height: 70vh;
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--ai-border);
 }
 
-/* 弹窗头部 */
+/* Header */
 .ai-explain-popup-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--ai-surface);
+  border-bottom: 1px solid var(--ai-border);
 }
 
 .ai-explain-popup-header h3 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: white;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ai-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .ai-explain-close {
-  background: rgba(255, 255, 255, 0.2);
+  background: transparent;
   border: none;
-  color: white;
-  width: 28px;
-  height: 28px;
+  color: var(--ai-text-secondary);
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   cursor: pointer;
   font-size: 20px;
@@ -83,142 +122,163 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s ease;
+  transition: var(--ai-transition);
   padding: 0;
 }
 
 .ai-explain-close:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--ai-surface-elevated);
+  color: var(--ai-text-primary);
 }
 
-/* 弹窗主体 */
+/* Body */
 .ai-explain-popup-body {
   padding: 20px;
   overflow-y: auto;
   flex: 1;
-  min-height: 100px;
+  min-height: 120px;
 }
 
-/* 加载状态 */
+/* Loading State */
 .ai-explain-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
-  color: #6b7280;
+  padding: 48px 20px;
+  color: var(--ai-text-secondary);
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .ai-explain-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #667eea;
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--ai-border);
+  border-top-color: var(--ai-primary);
   border-radius: 50%;
-  animation: ai-explain-spin 0.8s linear infinite;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
 }
 
-@keyframes ai-explain-spin {
+@keyframes spin {
   to { transform: rotate(360deg); }
 }
 
 .ai-explain-loading p {
-  margin-top: 16px;
+  margin: 0;
   font-size: 14px;
+  font-weight: 400;
 }
 
-/* 结果显示 */
+/* Result Display */
 .ai-explain-result {
   font-size: 14px;
   line-height: 1.7;
-  color: #1f2937;
+  color: var(--ai-text-primary);
+  animation: fadeIn 0.4s ease-out;
 }
 
 .ai-explain-result h1,
 .ai-explain-result h2,
 .ai-explain-result h3 {
-  margin-top: 16px;
-  margin-bottom: 8px;
+  margin-top: 20px;
+  margin-bottom: 10px;
   font-weight: 600;
-  color: #111827;
+  color: var(--ai-text-primary);
 }
 
-.ai-explain-result h1 { font-size: 18px; }
-.ai-explain-result h2 { font-size: 16px; }
-.ai-explain-result h3 { font-size: 14px; }
+.ai-explain-result h1 { font-size: 20px; }
+.ai-explain-result h2 { font-size: 17px; }
+.ai-explain-result h3 { font-size: 15px; }
 
 .ai-explain-result p {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .ai-explain-result code {
-  background: #f3f4f6;
-  padding: 2px 6px;
+  background: var(--ai-surface-elevated);
+  padding: 3px 8px;
   border-radius: 4px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: 'Google Sans Mono', 'SF Mono', 'Monaco', 'Menlo', monospace;
   font-size: 13px;
-  color: #dc2626;
+  color: var(--ai-primary);
+  font-weight: 500;
 }
 
 .ai-explain-result pre {
-  background: #1f2937;
-  color: #f9fafb;
-  padding: 12px;
-  border-radius: 6px;
+  background: var(--ai-surface-elevated);
+  color: var(--ai-text-primary);
+  padding: 14px;
+  border-radius: var(--ai-radius-sm);
   overflow-x: auto;
-  margin: 12px 0;
+  margin: 14px 0;
+  border: 1px solid var(--ai-border);
 }
 
 .ai-explain-result pre code {
   background: none;
   color: inherit;
   padding: 0;
+  font-weight: 400;
 }
 
 .ai-explain-result ul {
-  margin: 8px 0;
-  padding-left: 20px;
+  margin: 10px 0;
+  padding-left: 24px;
 }
 
 .ai-explain-result li {
-  margin: 4px 0;
+  margin: 6px 0;
+  line-height: 1.6;
 }
 
 .ai-explain-result strong {
   font-weight: 600;
-  color: #111827;
+  color: var(--ai-text-primary);
 }
 
 .ai-explain-result em {
   font-style: italic;
-  color: #4b5563;
+  color: var(--ai-text-secondary);
 }
 
 .ai-explain-result a {
-  color: #667eea;
+  color: var(--ai-primary);
   text-decoration: none;
+  font-weight: 500;
 }
 
 .ai-explain-result a:hover {
   text-decoration: underline;
 }
 
-/* 错误显示 */
+/* Error Display */
 .ai-explain-error {
-  padding: 20px;
+  padding: 16px;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 6px;
+  border-radius: var(--ai-radius-sm);
   color: #dc2626;
   font-size: 14px;
   text-align: center;
 }
 
-/* 弹窗底部 */
+/* Footer */
 .ai-explain-popup-footer {
   padding: 12px 20px;
-  border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border-top: 1px solid var(--ai-border);
+  background: var(--ai-surface-elevated);
   display: flex;
   justify-content: flex-end;
 }
@@ -226,32 +286,38 @@
 .ai-explain-copy {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  gap: 8px;
+  padding: 9px 16px;
+  background: var(--ai-surface);
+  border: 1px solid var(--ai-border);
+  border-radius: var(--ai-radius-sm);
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--ai-text-primary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--ai-transition);
   font-family: inherit;
 }
 
 .ai-explain-copy:hover {
-  background: #f9fafb;
-  border-color: #667eea;
-  color: #667eea;
+  background: var(--ai-primary-light);
+  border-color: var(--ai-primary);
+  color: var(--ai-primary);
 }
 
 .ai-explain-copy:active {
-  background: #f3f4f6;
+  background: var(--ai-surface-elevated);
+  transform: scale(0.98);
 }
 
-/* 滚动条样式 */
+.ai-explain-copy svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Scrollbar */
 .ai-explain-popup-body::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .ai-explain-popup-body::-webkit-scrollbar-track {
@@ -259,62 +325,61 @@
 }
 
 .ai-explain-popup-body::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
+  background: var(--ai-border);
+  border-radius: 3px;
 }
 
 .ai-explain-popup-body::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--ai-text-secondary);
 }
 
 /* ========================================
-   上下文高亮样式 - 三层级透明度
+   Context Highlight Styles - Blue Tint
    ======================================== */
 
-/* 层级 1：选中文本前后各 3 段（最亮，50% 透明度） */
+/* Level 1: Closest to selection (50% opacity) */
 .ai-context-level-1 {
-  background-color: rgba(255, 235, 59, 0.5) !important;
+  background-color: rgba(26, 115, 232, 0.12) !important;
   border-radius: 3px;
   transition: background-color 0.3s ease;
   cursor: help;
 }
 
 .ai-context-level-1:hover {
-  background-color: rgba(255, 235, 59, 0.65) !important;
+  background-color: rgba(26, 115, 232, 0.18) !important;
 }
 
-/* 层级 2：选中文本前后各 5 段（中等亮度，30% 透明度） */
+/* Level 2: Extended context (30% opacity) */
 .ai-context-level-2 {
-  background-color: rgba(255, 235, 59, 0.3) !important;
+  background-color: rgba(26, 115, 232, 0.08) !important;
   border-radius: 3px;
   transition: background-color 0.3s ease;
   cursor: help;
 }
 
 .ai-context-level-2:hover {
-  background-color: rgba(255, 235, 59, 0.45) !important;
+  background-color: rgba(26, 115, 232, 0.14) !important;
 }
 
-/* 层级 3：其他参考内容（最淡，15% 透明度） */
+/* Level 3: Distant reference (15% opacity) */
 .ai-context-level-3 {
-  background-color: rgba(255, 235, 59, 0.15) !important;
+  background-color: rgba(26, 115, 232, 0.05) !important;
   border-radius: 3px;
   transition: background-color 0.3s ease;
   cursor: help;
 }
 
 .ai-context-level-3:hover {
-  background-color: rgba(255, 235, 59, 0.3) !important;
+  background-color: rgba(26, 115, 232, 0.10) !important;
 }
 
-/* 确保高亮不影响嵌套元素的文本颜色 */
+/* Ensure highlights don't break content */
 .ai-context-level-1 *,
 .ai-context-level-2 *,
 .ai-context-level-3 * {
   color: inherit !important;
 }
 
-/* 确保高亮不会破坏链接等交互元素 */
 .ai-context-level-1 a,
 .ai-context-level-2 a,
 .ai-context-level-3 a {
@@ -326,4 +391,38 @@
 .ai-context-level-2 a:hover,
 .ai-context-level-3 a:hover {
   opacity: 0.8;
+}
+
+/* ========================================
+   Animations
+   ======================================== */
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ai-explain-popup-content {
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes buttonAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ai-explain-button {
+  animation: buttonAppear 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }

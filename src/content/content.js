@@ -135,8 +135,8 @@
     // 确保不超出视口
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const popupWidth = 400;
-    const popupMaxHeight = viewportHeight * 0.6;
+    const popupWidth = 480;
+    const popupMaxHeight = viewportHeight * 0.7;
 
     if (left + popupWidth > viewportWidth + scrollX) {
       left = viewportWidth + scrollX - popupWidth - 16;
@@ -396,6 +396,7 @@
       .replace(/^# (.+)$/gm, '<h1>$1</h1>')
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
       .replace(/^\- (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
       .replace(/\n\n/g, '</p><p>')
       .replace(/\n/g, '<br>');
   }

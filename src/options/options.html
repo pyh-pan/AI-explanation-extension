@@ -41,7 +41,7 @@
         <div class="form-group">
           <label for="apiKey">API Key <span class="required">*</span></label>
           <div class="input-group">
-            <input type="password" id="apiKey" placeholder="sk-..." />
+            <input type="password" id="apiKey" class="input-password" placeholder="sk-..." />
             <button type="button" id="toggleApiKey" class="icon-btn" title="显示/隐藏">
               <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -55,14 +55,14 @@
         <!-- API Endpoint -->
         <div class="form-group">
           <label for="apiEndpoint">API Endpoint</label>
-          <input type="text" id="apiEndpoint" placeholder="留空使用默认地址" />
+          <input type="text" id="apiEndpoint" class="input-text" placeholder="留空使用默认地址" />
           <small class="help-text">可选，留空使用官方 API 地址</small>
         </div>
 
         <!-- Model -->
         <div class="form-group">
           <label for="model">模型名称</label>
-          <select id="model">
+          <select id="model" class="input-select">
             <optgroup label="OpenAI 模型" id="openai-models">
               <option value="gpt-4o">GPT-4o</option>
               <option value="gpt-4o-mini" selected>GPT-4o Mini</option>
@@ -95,7 +95,7 @@
             </div>
             <div class="form-group">
               <label for="maxTokens">Max Tokens</label>
-              <input type="number" id="maxTokens" min="100" max="4000" step="100" value="1000" />
+              <input type="number" id="maxTokens" class="input-number" min="100" max="4000" step="100" value="1000" />
               <small class="help-text">最大生成长度</small>
             </div>
           </div>
@@ -139,7 +139,7 @@
         <!-- 上下文模式 -->
         <div class="form-group" id="contextModeGroup">
           <label for="contextMode">上下文模式</label>
-          <select id="contextMode">
+          <select id="contextMode" class="input-select">
             <option value="economic">经济模式 (~2000 tokens)</option>
             <option value="standard" selected>标准模式 (~6000 tokens)</option>
             <option value="precise">精确模式 (~12000 tokens)</option>
@@ -164,7 +164,7 @@
         <!-- 模板选择 -->
         <div class="form-group">
           <label for="promptTemplateSelect">模板选择</label>
-          <select id="promptTemplateSelect">
+          <select id="promptTemplateSelect" class="input-select">
             <option value="template:default" selected>默认模板（通用解释）</option>
             <option value="template:technical">技术文档模板</option>
             <option value="template:academic">学术论文模板</option>
@@ -176,7 +176,7 @@
         <!-- 自定义模板编辑器 -->
         <div class="form-group" id="customTemplateGroup" style="display: none;">
           <label for="customPromptTemplate">自定义模板</label>
-          <textarea id="customPromptTemplate" rows="12" class="code-editor" placeholder="输入自定义 Prompt 模板..."></textarea>
+          <textarea id="customPromptTemplate" class="code-editor" rows="12" placeholder="输入自定义 Prompt 模板..."></textarea>
           <div class="template-variables">
             <strong>可用变量：</strong>
             <code>{{pageTitle}}</code> - 网页标题 |
@@ -223,7 +223,7 @@
     </main>
 
     <footer>
-      <p>AI 划词解释 v1.0.0 | 数据仅存储在本地，不会上传至任何服务器</p>
+      <p>AI 划词解释 v2.0.0 | 数据仅存储在本地，不会上传至任何服务器</p>
     </footer>
   </div>
 

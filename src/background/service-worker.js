@@ -343,6 +343,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+
+  if (message.type === 'TEST_CONNECTION') {
+    handleTestConnection(message.config)
+      .then(result => {
+        sendResponse({ success: true, result });
+      })
+      .catch(error => {
+        console.error('Test connection error:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
+  }
 });
 
 /**
@@ -374,6 +386,27 @@ async function handleExplainRequest(message) {
     );
 
     return result;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * 处理测试连接请求
+ */
+async function handleTestConnection(config) {
+  try {
+    if (!config.apiKey) {
+      throw new Error('请先输入 API Key');
+    }
+
+    // 使用简单的测试消息
+    const testText = 'Hello, this is a connection test.';
+
+    // 调用 API
+    const result = await APIManager.callAPI(config, testText);
+
+    return { message: '连接成功！', result: result.substring(0, 100) + '...' };
   } catch (error) {
     throw error;
   }

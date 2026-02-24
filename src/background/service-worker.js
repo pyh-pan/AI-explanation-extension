@@ -1,7 +1,7 @@
 // Background Service Worker - 处理 API 调用
 
-// 预设 Prompt 模板库
-const PROMPT_TEMPLATES = {
+// 预设 Prompt 模板库（默认值）
+const DEFAULT_PRESET_TEMPLATES = {
   default: `你是一个智能助手，请基于网页内容的上下文，对用户选中的内容提供准确、深入的解释。
 
 【网页信息】
@@ -87,6 +87,70 @@ const PROMPT_TEMPLATES = {
 使用 Markdown 代码块格式，如果相关可以提供改进建议。`
 };
 
+// 运行时模板（包含自定义覆盖）
+let runtimeTemplates = { ...DEFAULT_PRESET_TEMPLATES };
+let customTemplates = {};
+
+/**
+ * 从存储加载模板配置
+ */
+async function loadTemplatesFromStorage() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['aiConfig'], (result) => {
+      const config = result.aiConfig || {};
+
+      // 加载自定义模板
+      customTemplates = config.customTemplates || {};
+
+      // 应用预设模板覆盖
+      const presetOverrides = config.presetOverrides || {};
+      runtimeTemplates = { ...DEFAULT_PRESET_TEMPLATES };
+      for (const [key, value] of Object.entries(presetOverrides)) {
+        const templateKey = key.replace('template:', '');
+        if (runtimeTemplates[templateKey]) {
+          runtimeTemplates[templateKey] = value;
+        }
+      }
+
+      console.log('Templates loaded:', {
+        presets: Object.keys(runtimeTemplates),
+        customs: Object.keys(customTemplates),
+        overrides: Object.keys(presetOverrides)
+      });
+
+      resolve();
+    });
+  });
+}
+
+/**
+ * 获取模板内容
+ */
+function getTemplate(templateKey) {
+  if (templateKey.startsWith('template:')) {
+    const key = templateKey.replace('template:', '');
+    return runtimeTemplates[key] || DEFAULT_PRESET_TEMPLATES.default;
+  } else if (templateKey.startsWith('custom:')) {
+    const name = templateKey.substring(7);
+    return customTemplates[name] || DEFAULT_PRESET_TEMPLATES.default;
+  } else if (typeof templateKey === 'string' && templateKey.trim()) {
+    // 直接传入的模板内容
+    return templateKey;
+  }
+  return DEFAULT_PRESET_TEMPLATES.default;
+}
+
+// 初始化时加载模板
+loadTemplatesFromStorage();
+
+// 监听存储变化以更新模板
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.aiConfig) {
+    console.log('Config changed, reloading templates...');
+    loadTemplatesFromStorage();
+  }
+});
+
 // API 调用管理器
 const APIManager = {
   /**
@@ -103,11 +167,10 @@ const APIManager = {
     // 获取模板（自定义或预设）
     let template = config.promptTemplate;
     if (!template || typeof template !== 'string') {
-      template = PROMPT_TEMPLATES.default;
-    } else if (template.startsWith('template:')) {
-      // 使用预设模板
-      const templateKey = template.replace('template:', '');
-      template = PROMPT_TEMPLATES[templateKey] || PROMPT_TEMPLATES.default;
+      template = DEFAULT_PRESET_TEMPLATES.default;
+    } else {
+      // 使用 getTemplate 函数获取模板内容
+      template = getTemplate(template);
     }
 
     // 替换模板变量
@@ -209,6 +272,52 @@ const APIManager = {
   },
 
   /**
+   * 调用 GLM API - 支持自定义 prompt
+   */
+  async callGLM(config, text, customPrompt = null) {
+    const endpoint = config.apiEndpoint || 'https://open.bigmodel.cn/api/paas/v4';
+    const prompt = customPrompt || this.generatePrompt(text);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch(`${endpoint}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify({
+          model: config.model,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: config.temperature || 0.7,
+          max_tokens: config.maxTokens || 1000
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error?.message || `API 错误: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const choice = data.choices[0];
+      // GLM 可能会返回 reasoning_content 或 content
+      const content = choice.message.reasoning_content || choice.message.content;
+      return content || choice.message.reasoning_content;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('请求超时，请稍后重试');
+      }
+      throw error;
+    }
+  },
+
+  /**
    * 调用 Gemini API - 支持自定义 prompt
    */
   async callGemini(config, text, customPrompt = null) {
@@ -274,6 +383,8 @@ const APIManager = {
         return await this.callOpenAI(config, text, prompt);
       case 'gemini':
         return await this.callGemini(config, text, prompt);
+      case 'glm':
+        return await this.callGLM(config, text, prompt);
       default:
         throw new Error('不支持的 AI 提供商');
     }
@@ -289,17 +400,18 @@ const StorageManager = {
     model: 'gpt-4o-mini',
     temperature: 0.7,
     maxTokens: 1000,
-    // 新增：上下文配置
+    // 上下文配置
     useContext: true,              // 启用上下文感知
     contextMode: 'standard',       // economic/standard/precise
-    enableHighlight: true,         // 启用高亮
-    promptTemplate: 'template:default'  // 默认模板
+    promptTemplate: 'template:default',  // 默认模板
+    customTemplates: {},           // 自定义模板
+    presetOverrides: {}           // 预设模板覆盖
   },
 
   async getConfig() {
     return new Promise((resolve) => {
       chrome.storage.local.get(['aiConfig'], (result) => {
-        const config = result.aiConfig || this.DEFAULT_CONFIG;
+        const config = result.aiConfig || {};
         // 合并默认配置，确保新增字段有值
         resolve({ ...this.DEFAULT_CONFIG, ...config });
       });

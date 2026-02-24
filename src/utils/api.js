@@ -43,6 +43,37 @@ const APIManager = {
     return data.choices[0].message.content;
   },
 
+  // 调用 GLM API
+  async callGLM(config, text) {
+    const endpoint = config.apiEndpoint || 'https://open.bigmodel.cn/api/paas/v4';
+    const prompt = this.generatePrompt(text);
+
+    const response = await fetch(`${endpoint}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: config.temperature || 0.7,
+        max_tokens: config.maxTokens || 1000
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'API 调用失败');
+    }
+
+    const data = await response.json();
+    const choice = data.choices[0];
+    // GLM 可能会返回 reasoning_content 或 content
+    const content = choice.message.reasoning_content || choice.message.content;
+    return content || choice.message.reasoning_content;
+  },
+
   // 调用 Gemini API
   async callGemini(config, text) {
     const endpoint = config.apiEndpoint || 'https://generativelanguage.googleapis.com';
@@ -89,6 +120,8 @@ const APIManager = {
         return await this.callOpenAI(config, text);
       case 'gemini':
         return await this.callGemini(config, text);
+      case 'glm':
+        return await this.callGLM(config, text);
       default:
         throw new Error('不支持的 AI 提供商');
     }

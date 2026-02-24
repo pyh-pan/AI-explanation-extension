@@ -5,7 +5,13 @@
       "Bash(sudo apt-get install:*)",
       "Bash(node:*)",
       "Bash(convert:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git config:*)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_install",
+      "Bash(git add:*)"
     ]
   }
 }

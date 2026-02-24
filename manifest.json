@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI 划词解释",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "选中网页上的任意文字，使用 AI 结合上下文获取准确解释",
   "permissions": [
     "storage",
@@ -9,7 +9,8 @@
   ],
   "host_permissions": [
     "https://api.openai.com/*",
-    "https://generativelanguage.googleapis.com/*"
+    "https://generativelanguage.googleapis.com/*",
+    "https://open.bigmodel.cn/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js"
@@ -17,7 +18,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/utils/readability.js", "src/utils/content-extractor.js", "src/content/content.js"],
+      "js": ["src/content/content.js"],
       "css": ["src/content/content.css"],
       "run_at": "document_end"
     }

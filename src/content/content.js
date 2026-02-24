@@ -1,502 +1,549 @@
-// Content Script - 划词识别和弹窗显示
+/**
+ * AI Explanation Extension - Content Script
+ * Handles text selection, UI creation, and communication with background service
+ */
 
 (function() {
   'use strict';
 
-  // 状态管理
-  let explainButton = null;
-  let explainPopup = null;
-  let currentSelection = null;
-  let isPopupVisible = false;
-  let currentHighlightRanges = null;  // 上下文高亮范围
+  // State variables
+  let button = null;
+  let popup = null;
+  let selectedText = '';
+  let isDragging = false;
+  let isResizing = false;
+  let resizeDirection = null;
+  let dragOffset = { x: 0, y: 0 };
+  let originalRect = null;
+  var cachedConfig = null;
 
-  // 创建"AI解释"按钮
-  function createExplainButton() {
-    const button = document.createElement('div');
-    button.id = 'ai-explain-btn';
+  // Resize edge threshold (pixels)
+  const RESIZE_THRESHOLD = 8;
+
+  // Context mode limits (characters)
+  const CONTEXT_LIMITS = {
+    'economic': 2000,   // ~2000 tokens
+    'standard': 6000,   // ~6000 tokens
+    'precise': 12000    // ~12000 tokens
+  };
+
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  function init() {
+    createButton();
+    createPopup();
+    setupEventListeners();
+    setupStorageListener();
+  }
+
+  // Create the AI explain button
+  function createButton() {
+    button = document.createElement('div');
     button.className = 'ai-explain-button';
     button.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
-      <span>AI解释</span>
+      <span>AI 解释</span>
     `;
     button.style.display = 'none';
     document.body.appendChild(button);
-    return button;
+
+    button.addEventListener('click', handleExplainClick);
   }
 
-  // 创建解释弹窗
-  function createExplainPopup() {
-    const popup = document.createElement('div');
-    popup.id = 'ai-explain-popup';
+  // Create the popup element
+  function createPopup() {
+    popup = document.createElement('div');
     popup.className = 'ai-explain-popup';
     popup.innerHTML = `
-      <div class="ai-explain-popup-content">
-        <div class="ai-explain-popup-header">
-          <h3>AI 解释</h3>
-          <button class="ai-explain-close" title="关闭">×</button>
+      <div class="ai-explain-popup-header">
+        <h3>AI 解释</h3>
+        <button class="ai-explain-close" title="关闭">&times;</button>
+      </div>
+      <div class="ai-explain-popup-body">
+        <div class="ai-explain-loading">
+          <p>正在分析...</p>
         </div>
-        <div class="ai-explain-popup-body">
-          <div class="ai-explain-loading">
-            <div class="ai-explain-spinner"></div>
-            <p>正在分析...</p>
-          </div>
-          <div class="ai-explain-result" style="display:none;"></div>
-          <div class="ai-explain-error" style="display:none;"></div>
-        </div>
-        <div class="ai-explain-popup-footer">
-          <button class="ai-explain-copy" style="display:none;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-            复制
-          </button>
-        </div>
+        <div class="ai-explain-result"></div>
+      </div>
+      <div class="ai-explain-popup-footer">
+        <button class="ai-explain-copy" title="复制解释">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          <span>复制</span>
+        </button>
       </div>
     `;
     popup.style.display = 'none';
     document.body.appendChild(popup);
 
-    // 绑定关闭按钮事件
+    // Setup popup event listeners
     const closeBtn = popup.querySelector('.ai-explain-close');
     closeBtn.addEventListener('click', hidePopup);
 
-    // 绑定复制按钮事件
     const copyBtn = popup.querySelector('.ai-explain-copy');
     copyBtn.addEventListener('click', copyResult);
 
-    // 点击外部关闭
-    popup.addEventListener('click', (e) => {
-      if (e.target === popup) {
-        hidePopup();
+    // Make header draggable
+    const header = popup.querySelector('.ai-explain-popup-header');
+    header.addEventListener('mousedown', startDrag);
+  }
+
+  // Setup document event listeners
+  function setupEventListeners() {
+    document.addEventListener('mouseup', handleTextSelection);
+    document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Add resize detection on popup
+    popup.addEventListener('mousemove', handlePopupMouseMove);
+    popup.addEventListener('mousedown', handlePopupMouseDown);
+  }
+
+  function setupStorageListener() {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === 'local' && changes.aiConfig) {
+        console.log('[Content] Config changed, invalidating cache');
+        cachedConfig = null;
       }
     });
-
-    return popup;
   }
 
-  // 显示按钮
-  function showButton(rect) {
-    if (!explainButton) {
-      explainButton = createExplainButton();
-    }
+  // Get resize direction based on mouse position
+  function getResizeDirection(e) {
+    if (!popup) return null;
 
-    const buttonWidth = 90;
-    const buttonHeight = 32;
-    const scrollX = window.scrollX || window.pageXOffset;
-    const scrollY = window.scrollY || window.pageYOffset;
+    const rect = popup.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
 
-    // 计算按钮位置（选中区域右上方）
-    let left = rect.right + scrollX + 8;
-    let top = rect.top + scrollY - buttonHeight - 8;
+    const onRightEdge = x >= rect.right - RESIZE_THRESHOLD;
+    const onLeftEdge = x <= rect.left + RESIZE_THRESHOLD;
+    const onBottomEdge = y >= rect.bottom - RESIZE_THRESHOLD;
+    const onTopEdge = y <= rect.top + RESIZE_THRESHOLD;
 
-    // 确保不超出视口
-    const viewportWidth = window.innerWidth;
-    if (left + buttonWidth > viewportWidth + scrollX) {
-      left = rect.left + scrollX - buttonWidth - 8;
-    }
+    if (onBottomEdge && onRightEdge) return 'se'; // Southeast
+    if (onBottomEdge && onLeftEdge) return 'sw'; // Southwest
+    if (onTopEdge && onRightEdge) return 'ne'; // Northeast
+    if (onTopEdge && onLeftEdge) return 'nw'; // Northwest
+    if (onRightEdge) return 'e'; // East
+    if (onLeftEdge) return 'w'; // West
+    if (onBottomEdge) return 's'; // South
+    if (onTopEdge) return 'n'; // North
 
-    explainButton.style.left = `${Math.max(8, left)}px`;
-    explainButton.style.top = `${Math.max(8, top)}px`;
-    explainButton.style.display = 'flex';
+    return null;
+  }
 
-    // 绑定点击事件
-    explainButton.onclick = (e) => {
-      e.stopPropagation();
-      handleExplainClick();
+  // Set cursor based on resize direction
+  function setResizeCursor(direction) {
+    const cursors = {
+      'n': 'n-resize',
+      's': 's-resize',
+      'e': 'e-resize',
+      'w': 'w-resize',
+      'ne': 'ne-resize',
+      'nw': 'nw-resize',
+      'se': 'se-resize',
+      'sw': 'sw-resize'
     };
+    popup.style.cursor = cursors[direction] || 'default';
   }
 
-  // 隐藏按钮
+  // Handle mouse move over popup
+  function handlePopupMouseMove(e) {
+    if (isDragging || isResizing) return;
+
+    const direction = getResizeDirection(e);
+    if (direction) {
+      setResizeCursor(direction);
+    } else {
+      const header = popup.querySelector('.ai-explain-popup-header');
+      if (header && header.contains(e.target)) {
+        popup.style.cursor = 'move';
+      } else {
+        popup.style.cursor = 'default';
+      }
+    }
+  }
+
+  // Handle mouse down on popup for resize
+  function handlePopupMouseDown(e) {
+    const direction = getResizeDirection(e);
+    if (direction) {
+      isResizing = true;
+      resizeDirection = direction;
+      originalRect = popup.getBoundingClientRect();
+      dragOffset.x = e.clientX;
+      dragOffset.y = e.clientY;
+      e.preventDefault();
+    }
+  }
+
+  // Handle text selection
+  function handleTextSelection(e) {
+    // Ignore if clicking on button or popup
+    if (button && button.contains(e.target)) return;
+    if (popup && popup.contains(e.target)) return;
+
+    setTimeout(() => {
+      const selection = window.getSelection();
+      const text = selection.toString().trim();
+
+      if (text.length > 0) {
+        selectedText = text;
+        showButton();
+      } else {
+        hideButton();
+      }
+    }, 10);
+  }
+
+  // Show button near selection
+  function showButton() {
+    if (!button) return;
+
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+
+      // Calculate position - show button above or below selection
+      let top = rect.top - 48; // Above selection
+      let left = rect.left + (rect.width / 2) - 60; // Center horizontally
+
+      // If above selection would be off screen, show below
+      if (top < 16) {
+        top = rect.bottom + 8;
+      }
+
+      // Keep button within viewport
+      const buttonWidth = 120;
+      const buttonHeight = 40;
+
+      if (left + buttonWidth > window.innerWidth - 16) {
+        left = window.innerWidth - buttonWidth - 16;
+      }
+      if (left < 16) {
+        left = 16;
+      }
+      if (top + buttonHeight > window.innerHeight - 16) {
+        top = window.innerHeight - buttonHeight - 16;
+      }
+      if (top < 16) {
+        top = 16;
+      }
+
+      button.style.left = left + 'px';
+      button.style.top = top + 'px';
+      button.style.display = 'flex';
+    }
+  }
+
+  // Hide button
   function hideButton() {
-    if (explainButton) {
-      explainButton.style.display = 'none';
+    if (button) {
+      button.style.display = 'none';
     }
   }
 
-  // 显示弹窗
-  function showPopup() {
-    if (!explainPopup) {
-      explainPopup = createExplainPopup();
-    }
-
-    if (!explainButton) return;
-
-    const buttonRect = explainButton.getBoundingClientRect();
-    const scrollX = window.scrollX || window.pageXOffset;
-    const scrollY = window.scrollY || window.pageYOffset;
-
-    // 计算弹窗位置
-    let left = buttonRect.left + scrollX;
-    let top = buttonRect.bottom + scrollY + 8;
-
-    // 确保不超出视口
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const popupWidth = 480;
-    const popupMaxHeight = viewportHeight * 0.7;
-
-    if (left + popupWidth > viewportWidth + scrollX) {
-      left = viewportWidth + scrollX - popupWidth - 16;
-    }
-
-    if (top + popupMaxHeight > viewportHeight + scrollY) {
-      top = buttonRect.top + scrollY - popupMaxHeight - 8;
-    }
-
-    explainPopup.style.left = `${Math.max(16, left)}px`;
-    explainPopup.style.top = `${Math.max(16, top)}px`;
-    explainPopup.style.maxHeight = `${popupMaxHeight}px`;
-    explainPopup.style.display = 'block';
-
-    // 重置状态
-    explainPopup.querySelector('.ai-explain-loading').style.display = 'block';
-    explainPopup.querySelector('.ai-explain-result').style.display = 'none';
-    explainPopup.querySelector('.ai-explain-error').style.display = 'none';
-    explainPopup.querySelector('.ai-explain-copy').style.display = 'none';
-
-    isPopupVisible = true;
-
-    // 应用上下文高亮
-    if (currentHighlightRanges) {
-      applyHighlights(currentHighlightRanges);
-    }
-  }
-
-  // 隐藏弹窗
-  function hidePopup() {
-    clearHighlights();  // 清除高亮
-    if (explainPopup) {
-      explainPopup.style.display = 'none';
-    }
-    isPopupVisible = false;
-  }
-
-  // 处理解释按钮点击
+  // Handle explain button click
   async function handleExplainClick() {
-    const selectedText = currentSelection ? currentSelection.toString().trim() : '';
-
-    if (!selectedText) {
-      showError('请先选择要解释的文字');
-      return;
-    }
+    if (!selectedText) return;
 
     hideButton();
     showPopup();
+    await fetchExplanation(selectedText);
+  }
+
+  // Show popup
+  function showPopup() {
+    if (!popup) return;
+
+    // Get selection position
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+
+      // Position popup on the right side of selection, vertically centered
+      let left = rect.right + 16;
+      let top = rect.top + (rect.height / 2) - 200; // Center vertically (assuming 400px height)
+
+      // Ensure popup doesn't go off screen
+      const popupWidth = 480;
+      const popupHeight = 400;
+
+      if (left + popupWidth > window.innerWidth) {
+        left = rect.left - popupWidth - 16;
+      }
+      if (left < 0) {
+        left = 16;
+      }
+      if (top + popupHeight > window.innerHeight) {
+        top = window.innerHeight - popupHeight - 16;
+      }
+      if (top < 0) {
+        top = 16;
+      }
+
+      popup.style.left = left + 'px';
+      popup.style.top = top + 'px';
+    }
+
+    popup.style.display = 'flex';
+
+    // Reset popup content
+    const loading = popup.querySelector('.ai-explain-loading');
+    const result = popup.querySelector('.ai-explain-result');
+    const copyBtn = popup.querySelector('.ai-explain-copy');
+
+    loading.style.display = 'flex';
+    result.style.display = 'none';
+    copyBtn.style.display = 'none';
+  }
+
+  // Hide popup
+  function hidePopup() {
+    if (popup) {
+      popup.style.display = 'none';
+    }
+  }
+
+  // Fetch explanation from background service
+  async function fetchExplanation(text) {
+    const loading = popup.querySelector('.ai-explain-loading');
+    const result = popup.querySelector('.ai-explain-result');
+    const copyBtn = popup.querySelector('.ai-explain-copy');
 
     try {
-      // 获取用户配置
-      const config = await getConfig();
+      // Get page context
+      const context = await getPageContext();
 
-      // 如果启用了上下文功能，提取页面内容
-      let contextData = null;
-      let mainContent = null;
-
-      if (config.useContext !== false) {  // 默认启用
-        try {
-          // 提取页面上下文（懒加载 + 缓存）
-          if (!window.contentExtractor) {
-            console.error('ContentExtractor not available');
-          } else {
-            mainContent = await window.contentExtractor.extract(document);
-            const position = window.contentExtractor.findSelectionPosition(selectedText);
-
-            // 获取上下文预算
-            const maxTokens = getContextMaxTokens(config.contextMode || 'standard');
-
-            // 检查内容是否充足
-            if (mainContent && window.contentExtractor.hasSufficientContent(mainContent)) {
-              // 距离优先截断
-              const context = window.contentExtractor.truncateByDistance(
-                mainContent,
-                position,
-                maxTokens
-              );
-
-              // 保存上下文范围用于高亮
-              currentHighlightRanges = context.highlightRanges;
-
-              contextData = {
-                content: context.content,
-                metadata: {
-                  paragraphs: context.paragraphs,
-                  totalTokens: context.usedTokens,
-                  pageTitle: mainContent.title,
-                  pageUrl: window.location.href,
-                  isFallback: mainContent.isFallback
-                }
-              };
-
-              console.log('[Content Script] Context extracted:', {
-                paragraphs: context.paragraphCount,
-                tokens: context.usedTokens,
-                mode: config.contextMode || 'standard'
-              });
-            } else {
-              console.log('[Content Script] Insufficient content, using no-context mode');
-            }
-          }
-        } catch (extractorError) {
-          console.warn('[Content Script] Context extraction failed:', extractorError);
-          // 继续使用无上下文模式
-        }
-      }
-
-      // 构建请求数据
-      const requestData = {
+      // Send message to background service - use correct message type
+      const message = {
         type: 'EXPLAIN_TEXT',
-        text: selectedText
+        text: text,
+        pageUrl: window.location.href,
+        pageTitle: document.title
       };
 
-      // 如果有上下文数据，添加到请求中
-      if (contextData) {
-        requestData.context = contextData.content;
-        requestData.contextMetadata = contextData.metadata;
-        requestData.promptTemplate = config.promptTemplate || 'default';
+      // Only add context if it's not empty
+      if (context) {
+        message.context = context;
+        message.contextMetadata = {
+          pageTitle: document.title,
+          pageUrl: window.location.href
+        };
       }
 
-      // 发送消息到 background script
-      const response = await chrome.runtime.sendMessage(requestData);
+      console.log('[Content] Sending message to background:', JSON.stringify({
+        type: message.type,
+        textLength: text.length,
+        hasContext: !!context,
+        contextLength: context ? context.length : 0
+      }, null, 2));
 
-      if (response.success) {
-        showResult(response.result);
+      const response = await chrome.runtime.sendMessage(message);
+
+      loading.style.display = 'none';
+
+      if (response && response.success) {
+        result.innerHTML = formatResult(response.result);
+        result.style.display = 'block';
+        copyBtn.style.display = 'flex';
       } else {
-        showError(response.error || '获取解释失败');
+        result.innerHTML = `<div class="ai-explain-error">${response?.error || '解释失败，请重试'}</div>`;
+        result.style.display = 'block';
       }
     } catch (error) {
-      showError('网络错误，请检查网络连接');
-      console.error('Explain error:', error);
+      loading.style.display = 'none';
+      result.innerHTML = `<div class="ai-explain-error">发生错误: ${error.message}</div>`;
+      result.style.display = 'block';
     }
   }
 
-  // 获取配置
+  // Get page context
+  async function getPageContext() {
+    // Get config to check if context is enabled and get mode
+    const config = await getConfig();
+
+    console.log('[Content] getPageContext called. Full config:', JSON.stringify(config, null, 2));
+
+    // If context is disabled, return empty
+    if (!config.useContext) {
+      console.log('[Content] Context disabled, returning empty string');
+      return '';
+    }
+
+    console.log('[Content] useContext:', config.useContext, 'contextMode:', config.contextMode);
+    console.log('[Content] CONTEXT_LIMITS:', CONTEXT_LIMITS);
+
+    // Get main content from the page
+    const article = document.querySelector('article') ||
+                    document.querySelector('main') ||
+                    document.querySelector('.content') ||
+                    document.body;
+
+    // Get text content, limit based on context mode
+    let context = article.innerText || article.textContent || '';
+
+    // Get limit based on context mode
+    const limit = CONTEXT_LIMITS[config.contextMode] || CONTEXT_LIMITS['standard'];
+    context = context.substring(0, limit);
+
+    console.log('[Content] Final - mode:', config.contextMode, 'limit:', limit, 'context length:', context.length);
+
+    return context;
+  }
+
+  // Get config from storage
   async function getConfig() {
+    if (cachedConfig) {
+      console.log('[Content] Using cached config:', cachedConfig);
+      return cachedConfig;
+    }
+
     return new Promise((resolve) => {
       chrome.storage.local.get(['aiConfig'], (result) => {
-        const config = result.aiConfig || {};
-        resolve({
-          useContext: config.useContext !== false,  // 默认启用
-          contextMode: config.contextMode || 'standard',  // economic/standard/precise
-          enableHighlight: config.enableHighlight !== false,  // 默认启用
-          promptTemplate: config.promptTemplate || 'default'
-        });
+        cachedConfig = result.aiConfig || {};
+        console.log('[Content] Loaded config from storage:', JSON.stringify(cachedConfig, null, 2));
+        resolve(cachedConfig);
       });
     });
   }
 
-  // 根据模式获取最大 token 数
-  function getContextMaxTokens(mode) {
-    const modes = {
-      economic: 2000,
-      standard: 6000,
-      precise: 12000
-    };
-    return modes[mode] || modes.standard;
+  // Format result with markdown-like styling
+  function formatResult(text) {
+    if (!text) return '';
+
+    // Convert markdown-style formatting
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    text = text.replace(/`(.+?)`/g, '<code>$1</code>');
+    text = text.replace(/\n/g, '<br>');
+
+    return text;
   }
 
-  // 应用三层级高亮
-  function applyHighlights(highlightRanges) {
-    if (!highlightRanges || highlightRanges.length === 0) return;
+  // Copy result to clipboard
+  async function copyResult() {
+    const result = popup.querySelector('.ai-explain-result');
+    const text = result.innerText;
 
-    getConfig().then(config => {
-      if (config.enableHighlight === false) return;
+    try {
+      await navigator.clipboard.writeText(text);
 
-      highlightRanges.forEach(range => {
-        if (range.element && range.level) {
-          range.element.classList.add(`ai-context-level-${range.level}`);
-        }
-      });
-
-      console.log(`[Content Script] Applied highlights to ${highlightRanges.length} elements`);
-    });
-  }
-
-  // 清除所有高亮
-  function clearHighlights() {
-    if (!currentHighlightRanges) return;
-
-    for (let i = 1; i <= 3; i++) {
-      document.querySelectorAll(`.ai-context-level-${i}`).forEach(el => {
-        el.classList.remove(`ai-context-level-${i}`);
-      });
-    }
-
-    currentHighlightRanges = null;
-    console.log('[Content Script] Cleared highlights');
-  }
-
-  // 显示结果
-  function showResult(text) {
-    if (!explainPopup) return;
-
-    const loadingEl = explainPopup.querySelector('.ai-explain-loading');
-    const resultEl = explainPopup.querySelector('.ai-explain-result');
-    const errorEl = explainPopup.querySelector('.ai-explain-error');
-    const copyBtn = explainPopup.querySelector('.ai-explain-copy');
-
-    loadingEl.style.display = 'none';
-    errorEl.style.display = 'none';
-
-    // 使用简单的 Markdown 渲染
-    resultEl.innerHTML = renderMarkdown(text);
-    resultEl.style.display = 'block';
-    copyBtn.style.display = 'flex';
-  }
-
-  // 显示错误
-  function showError(message) {
-    if (!explainPopup) return;
-
-    const loadingEl = explainPopup.querySelector('.ai-explain-loading');
-    const resultEl = explainPopup.querySelector('.ai-explain-result');
-    const errorEl = explainPopup.querySelector('.ai-explain-error');
-
-    loadingEl.style.display = 'none';
-    resultEl.style.display = 'none';
-
-    errorEl.textContent = message;
-    errorEl.style.display = 'block';
-  }
-
-  // 复制结果
-  function copyResult() {
-    if (!explainPopup) return;
-
-    const resultEl = explainPopup.querySelector('.ai-explain-result');
-    const text = resultEl.textContent;
-
-    navigator.clipboard.writeText(text).then(() => {
-      const copyBtn = explainPopup.querySelector('.ai-explain-copy');
+      // Show feedback
+      const copyBtn = popup.querySelector('.ai-explain-copy');
       const originalText = copyBtn.innerHTML;
-      copyBtn.innerHTML = '✓ 已复制';
+      copyBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span>已复制</span>
+      `;
       setTimeout(() => {
         copyBtn.innerHTML = originalText;
       }, 2000);
-    }).catch(err => {
-      console.error('Copy failed:', err);
-    });
-  }
-
-  // 简单的 Markdown 渲染
-  function renderMarkdown(text) {
-    if (!text) return '';
-
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-      .replace(/^\- (.+)$/gm, '<li>$1</li>')
-      .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>');
-  }
-
-  // 处理选区变化
-  function handleSelection() {
-    const selection = window.getSelection();
-
-    // 检查是否在输入框中
-    const activeElement = document.activeElement;
-    if (activeElement && (
-      activeElement.tagName === 'INPUT' ||
-      activeElement.tagName === 'TEXTAREA' ||
-      activeElement.isContentEditable
-    )) {
-      hideButton();
-      return;
+    } catch (error) {
+      console.error('Copy failed:', error);
     }
+  }
 
-    const selectedText = selection.toString().trim();
+  // Handle document click
+  function handleDocumentClick(e) {
+    if (isDragging || isResizing) return;
 
-    // 检查是否在插件自己的弹窗中
-    if (selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const container = range.commonAncestorContainer;
-      if (container.nodeType === Node.TEXT_NODE) {
-        const parent = container.parentElement;
-        if (parent && (parent.closest('#ai-explain-popup') || parent.closest('#ai-explain-btn'))) {
-          return;
-        }
-      } else if (container.closest) {
-        if (container.closest('#ai-explain-popup') || container.closest('#ai-explain-btn')) {
-          return;
+    // Hide popup if clicking outside
+    if (popup && popup.style.display !== 'none') {
+      if (!popup.contains(e.target) && !button.contains(e.target)) {
+        const selection = window.getSelection();
+        if (!selection.toString().trim()) {
+          hidePopup();
         }
       }
     }
+  }
 
-    if (selectedText.length > 0) {
-      currentSelection = selection;
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      showButton(rect);
-    } else {
-      currentSelection = null;
-      hideButton();
+  // Drag functionality
+  function startDrag(e) {
+    if (e.target.classList.contains('ai-explain-close')) return;
+    isDragging = true;
+    const rect = popup.getBoundingClientRect();
+    dragOffset.x = e.clientX - rect.left;
+    dragOffset.y = e.clientY - rect.top;
+    e.preventDefault();
+  }
+
+  function handleMouseMove(e) {
+    if (isDragging) {
+      let newLeft = e.clientX - dragOffset.x;
+      let newTop = e.clientY - dragOffset.y;
+
+      // Keep popup within viewport
+      const rect = popup.getBoundingClientRect();
+      const maxLeft = window.innerWidth - rect.width;
+      const maxTop = window.innerHeight - rect.height;
+
+      newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+      newTop = Math.max(0, Math.min(newTop, maxTop));
+
+      popup.style.left = newLeft + 'px';
+      popup.style.top = newTop + 'px';
+    } else if (isResizing && resizeDirection) {
+      const dx = e.clientX - dragOffset.x;
+      const dy = e.clientY - dragOffset.y;
+      const rect = originalRect;
+      const minWidth = 400;
+      const minHeight = 200;
+
+      let newWidth = rect.width;
+      let newHeight = rect.height;
+      let newLeft = rect.left;
+      let newTop = rect.top;
+
+      // Handle resize based on direction
+      if (resizeDirection.includes('e')) {
+        newWidth = Math.max(minWidth, rect.width + dx);
+      }
+      if (resizeDirection.includes('w')) {
+        const widthDelta = Math.min(dx, rect.width - minWidth);
+        newWidth = rect.width - widthDelta;
+        newLeft = rect.left + widthDelta;
+      }
+      if (resizeDirection.includes('s')) {
+        newHeight = Math.max(minHeight, rect.height + dy);
+      }
+      if (resizeDirection.includes('n')) {
+        const heightDelta = Math.min(dy, rect.height - minHeight);
+        newHeight = rect.height - heightDelta;
+        newTop = rect.top + heightDelta;
+      }
+
+      // Apply new size and position
+      popup.style.width = newWidth + 'px';
+      popup.style.height = newHeight + 'px';
+      popup.style.left = newLeft + 'px';
+      popup.style.top = newTop + 'px';
     }
   }
 
-  // 监听选区变化
-  document.addEventListener('mouseup', (e) => {
-    // 延迟执行，确保选区完成
-    setTimeout(() => {
-      handleSelection();
-    }, 10);
-  });
+  function handleMouseUp(e) {
+    isDragging = false;
+    isResizing = false;
+    resizeDirection = null;
+    originalRect = null;
+  }
 
-  document.addEventListener('keyup', (e) => {
-    // 支持 Shift + 方向键选择
-    if (e.shiftKey) {
-      setTimeout(() => {
-        handleSelection();
-      }, 10);
-    }
-  });
-
-  // 监听滚动，隐藏按钮和弹窗
-  let scrollTimeout;
-  document.addEventListener('scroll', () => {
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(() => {
-      if (!isPopupVisible) {
-        hideButton();
-      }
-    }, 100);
-  }, true);
-
-  // 监听页面点击，关闭弹窗
-  document.addEventListener('click', (e) => {
-    if (isPopupVisible && !e.target.closest('#ai-explain-popup')) {
-      // 如果点击的是新的选区，不关闭
-      const selection = window.getSelection();
-      if (selection.toString().trim().length === 0) {
-        hidePopup();
-      }
-    }
-  });
-
-  // 监听键盘 ESC 关闭弹窗
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isPopupVisible) {
-      hidePopup();
-    }
-  });
-
-  // 监听来自 background 的消息
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'CHECK_CONFIG') {
-      sendResponse({ configured: true });
-    }
-  });
-
-  console.log('AI划词解释插件已加载');
 })();

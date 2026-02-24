@@ -225,12 +225,7 @@
         content: includedParagraphs.map(i => paragraphs[i].text).join('\n\n'),
         paragraphs: includedParagraphs.map(i => ({
           index: i,
-          text: paragraphs[i].text,
-          level: this.getHighlightLevel(i, selectionIndex)
-        })),
-        highlightRanges: includedParagraphs.map(i => ({
-          element: paragraphs[i].element,
-          level: this.getHighlightLevel(i, selectionIndex)
+          text: paragraphs[i].text
         })),
         usedTokens: totalTokens,
         paragraphCount: includedParagraphs.length,
@@ -240,16 +235,6 @@
       console.log(`[ContentExtractor] Truncated to ${result.paragraphCount}/${result.totalParagraphs} paragraphs, ${result.usedTokens} tokens`);
 
       return result;
-    }
-
-    /**
-     * Get highlight level for a paragraph
-     */
-    getHighlightLevel(paraIndex, selectionIndex) {
-      const distance = Math.abs(paraIndex - selectionIndex);
-      if (distance <= 3) return 1;
-      if (distance <= 5) return 2;
-      return 3;
     }
 
     /**
